@@ -1,4 +1,5 @@
 // Copyright (c) Mysten Labs, Inc.
+// Copyright (c) The Social Proof Foundation, LLC.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{verify, AppState, VerifyError, VerifyRequest};
@@ -38,7 +39,7 @@ async fn test_verify() {
             bytes: bytes.to_string(),
             intent_scope: IntentScope::TransactionData,
             author: None,
-            network: Some(crate::SuiEnv::Devnet),
+            network: Some(crate::MysEnv::Devnet),
             curr_epoch: Some(1),
         }),
     )
@@ -54,7 +55,7 @@ async fn test_verify() {
             bytes: bytes.to_string(),
             intent_scope: IntentScope::TransactionData,
             author: None,
-            network: Some(crate::SuiEnv::Mainnet),
+            network: Some(crate::MysEnv::Mainnet),
             curr_epoch: Some(1),
         }),
     )
@@ -69,7 +70,7 @@ async fn test_verify() {
             bytes: bytes.to_string(),
             intent_scope: IntentScope::TransactionData,
             author: None,
-            network: Some(crate::SuiEnv::Devnet),
+            network: Some(crate::MysEnv::Devnet),
             curr_epoch: Some(11),
         }),
     )
@@ -84,7 +85,7 @@ async fn test_verify() {
             bytes: bytes.to_string(),
             intent_scope: IntentScope::PersonalMessage,
             author: None,
-            network: Some(crate::SuiEnv::Devnet),
+            network: Some(crate::MysEnv::Devnet),
             curr_epoch: Some(1),
         }),
     )
@@ -99,7 +100,7 @@ async fn test_verify() {
             bytes: bytes.to_string(),
             intent_scope: IntentScope::PersonalMessage,
             author: None,
-            network: Some(crate::SuiEnv::Devnet),
+            network: Some(crate::MysEnv::Devnet),
             curr_epoch: Some(1),
         }),
     )

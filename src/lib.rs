@@ -1,8 +1,10 @@
 // Copyright (c) Mysten Labs, Inc.
+// Copyright (c) The Social Proof Foundation, LLC.
 // SPDX-License-Identifier: Apache-2.0
 
 use axum::response::{IntoResponse, Response};
 use axum::{extract::State, Json};
+use axum::http::StatusCode;
 use fastcrypto::encoding::{Base64, Encoding};
 use fastcrypto_zkp::bn254::{
     zk_login::{JwkId, JWK},
@@ -10,16 +12,15 @@ use fastcrypto_zkp::bn254::{
 };
 use im::hashmap::HashMap as ImHashMap;
 use parking_lot::RwLock;
-use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use shared_crypto::intent::IntentVersion;
 use shared_crypto::intent::{AppId, Intent, IntentMessage, IntentScope, PersonalMessage};
 use std::{collections::HashMap, sync::Arc};
-use sui_sdk::SuiClientBuilder;
-use sui_types::committee::EpochId;
-use sui_types::{
-    base_types::SuiAddress,
+use mys_sdk::MysClientBuilder;
+use mys_types::committee::EpochId;
+use mys_types::{
+    base_types::MysAddress,
     crypto::ToFromBytes,
     signature::{AuthenticatorTrait, GenericSignature, VerifyParams},
     transaction::TransactionData,
@@ -48,17 +49,17 @@ pub struct VerifyRequest {
     /// This determines how the `bytes` is deserialized.
     pub intent_scope: IntentScope,
     /// The author of the intent.
-    pub author: Option<SuiAddress>,
+    pub author: Option<MysAddress>,
     /// The network to verify the signature against. This determins the
     /// ZkLoginEnv.
-    pub network: Option<SuiEnv>,
+    pub network: Option<MysEnv>,
     /// The current epoch to verify the signature against. If not provided,
     /// use `network` to fetch the current epoch.
     pub curr_epoch: Option<EpochId>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
-pub enum SuiEnv {
+pub enum MysEnv {
     #[default]
     Mainnet,
     Testnet,
@@ -66,13 +67,13 @@ pub enum SuiEnv {
     Localnet,
 }
 
-impl SuiEnv {
+impl MysEnv {
     fn get_params(&self) -> (&str, ZkLoginEnv) {
         match self {
-            SuiEnv::Mainnet => ("https://fullnode.mainnet.sui.io:443", ZkLoginEnv::Prod),
-            SuiEnv::Testnet => ("https://fullnode.testnet.sui.io:443", ZkLoginEnv::Prod),
-            SuiEnv::Devnet => ("https://fullnode.devnet.sui.io:443", ZkLoginEnv::Test),
-            SuiEnv::Localnet => ("http://127.0.0.1:9000", ZkLoginEnv::Test),
+            MysEnv::Mainnet => ("https://fullnode.mainnet.mysocial.network:443", ZkLoginEnv::Prod),
+            MysEnv::Testnet => ("https://fullnode.testnet.mysocial.network:443", ZkLoginEnv::Prod),
+            MysEnv::Devnet => ("https://fullnode.devnet.mysocial.network:443", ZkLoginEnv::Test),
+            MysEnv::Localnet => ("http://127.0.0.1:9000", ZkLoginEnv::Test),
         }
     }
 }
@@ -91,7 +92,7 @@ pub enum VerifyError {
     GenericError(String),
     /// Fail to parse payload.
     ParsingError,
-    /// Error when getting epoch from sui client.
+    /// Error when getting epoch from MySocial client.
     GetEpochError,
 }
 
@@ -123,14 +124,14 @@ pub async fn verify(
     let curr_epoch = match payload.curr_epoch {
         Some(curr_epoch) => curr_epoch,
         None => {
-            let sui_client = SuiClientBuilder::default()
+            let mys_client = MysClientBuilder::default()
                 .build(url)
                 .await
                 .map_err(|_| VerifyError::GetEpochError)?;
 
-            sui_client
+            mys_client
                 .governance_api()
-                .get_latest_sui_system_state()
+                .get_latest_mys_system_state()
                 .await
                 .map_err(|_| VerifyError::GetEpochError)?
                 .epoch
@@ -139,7 +140,7 @@ pub async fn verify(
     info!("curr_epoch: {:?}", curr_epoch);
 
     let parsed: ImHashMap<JwkId, JWK> = state.jwks.read().clone().into_iter().collect();
-    let aux_verify_data = VerifyParams::new(parsed, vec![], env, true, true);
+    let aux_verify_data = VerifyParams::new(parsed, vec![], env, true, true, None);
     info!("aux_verify_data: {:?}", aux_verify_data);
 
     match GenericSignature::from_bytes(
@@ -153,14 +154,9 @@ pub async fn verify(
                 IntentScope::TransactionData => {
                     let tx_data: TransactionData =
                         bcs::from_bytes(&bytes).map_err(|_| VerifyError::ParsingError)?;
-                    let intent_msg = IntentMessage::new(Intent::sui_transaction(), tx_data.clone());
+                    let intent_msg = IntentMessage::new(Intent::mys_transaction(), tx_data.clone());
                     let author = tx_data.execution_parts().1;
-                    match zk.verify_authenticator(
-                        &intent_msg,
-                        author,
-                        Some(curr_epoch),
-                        &aux_verify_data,
-                    ) {
+                    match zk.verify_user_authenticator_epoch(curr_epoch, None) {
                         Ok(_) => Ok(Json(VerifyResponse { is_verified: true })),
                         Err(e) => Err(VerifyError::GenericError(e.to_string())),
                     }
@@ -171,7 +167,7 @@ pub async fn verify(
                         Intent {
                             scope: IntentScope::PersonalMessage,
                             version: IntentVersion::V0,
-                            app_id: AppId::Sui,
+                            app_id: AppId::Mys,
                         },
                         tx_data,
                     );
@@ -179,12 +175,7 @@ pub async fn verify(
                         Some(author) => author,
                         None => return Err(VerifyError::ParsingError),
                     };
-                    match zk.verify_authenticator(
-                        &intent_msg,
-                        author,
-                        Some(curr_epoch),
-                        &aux_verify_data,
-                    ) {
+                    match zk.verify_user_authenticator_epoch(curr_epoch, None) {
                         Ok(_) => Ok(Json(VerifyResponse { is_verified: true })),
                         Err(e) => Err(VerifyError::GenericError(e.to_string())),
                     }
