@@ -9,6 +9,7 @@ use axum::{
 use clap::{Parser, ValueEnum};
 use fastcrypto_zkp::bn254::zk_login::{fetch_jwks, OIDCProvider};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tower_http::cors::{CorsLayer, AllowOrigin};
 use tracing::{info, warn};
 use zklogin_verifier::{verify, AppState};
 
@@ -172,6 +173,11 @@ async fn main() {
         }
     });
 
+    let cors = CorsLayer::new()
+        .allow_origin("http://localhost:3000".parse::<axum::http::HeaderValue>().unwrap())
+        .allow_methods([axum::http::Method::POST, axum::http::Method::OPTIONS])
+        .allow_headers([axum::http::header::CONTENT_TYPE]);
+
     let app = Router::new()
         .route("/", get(ping))
         .route("/verify", post(verify))
@@ -180,6 +186,7 @@ async fn main() {
             let serializable_config = SerializableNetworkConfig::from(&network_config);
             serde_json::to_string_pretty(&serializable_config).unwrap() 
         }))
+        .layer(cors)
         .with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], cli.port));
