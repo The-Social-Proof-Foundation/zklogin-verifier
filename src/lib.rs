@@ -70,9 +70,9 @@ pub enum MysEnv {
 impl MysEnv {
     fn get_params(&self) -> (&str, ZkLoginEnv) {
         match self {
-            MysEnv::Mainnet => ("https://fullnode.mainnet.mysocial.network:443", ZkLoginEnv::Prod),
-            MysEnv::Testnet => ("https://fullnode.testnet.mysocial.network:443", ZkLoginEnv::Prod),
-            MysEnv::Devnet => ("https://fullnode.devnet.mysocial.network:443", ZkLoginEnv::Test),
+            MysEnv::Mainnet => ("https://fullnode.mainnet.mysocial.network:8082", ZkLoginEnv::Prod),
+            MysEnv::Testnet => ("https://fullnode.testnet.mysocial.network:8082", ZkLoginEnv::Prod),
+            MysEnv::Devnet => ("https://fullnode.devnet.mysocial.network:8082", ZkLoginEnv::Test),
             MysEnv::Localnet => ("http://127.0.0.1:9000", ZkLoginEnv::Test),
         }
     }
